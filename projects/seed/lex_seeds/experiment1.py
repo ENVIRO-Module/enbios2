@@ -207,10 +207,11 @@ def get_stuff(df):
     for index,row in df.iterrows():
         other_stuff=[]
         alias=row['aliases']
-        flow_out_sum=str(row['flow_out_sum'])
+        flow_out_sum=(row['flow_out_sum'])
         unit=row['units']
-        other_stuff.append(flow_out_sum)
         other_stuff.append(unit)
+        other_stuff.append(flow_out_sum)
+
         stuff[alias]=other_stuff
     return stuff
 
