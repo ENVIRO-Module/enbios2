@@ -15,7 +15,7 @@ from bw2data.backends import Activity
 
 
 
-#getLogger("peewee").setLevel("ERROR")
+getLogger("peewee").setLevel("ERROR")
 
 pass
 
@@ -38,78 +38,31 @@ processors=pd.read_excel(processors_path, sheet_name='BareProcessors simulation'
 activities_cool={}
 for index,row in processors.iterrows():
     code=str(row['BW_DB_FILENAME'])
-    print(code)
+
+    print('im parsing', str(row['Processor']))
     try:
         act=database.get(code)
+
     except UnknownObject:
+        print(row['Processor'],'has an unknown object')
         pass
 
     name=act['name']
-    alias=row['Processor']+'_'+row['@SimulationCarrier']
-    activities_cool[name]={
-        'alias': alias,
+
+    alias=str(row['Processor'])+'_'+str(row['@SimulationCarrier'])
+    print(alias)
+
+
+
+    activities_cool[alias]={
+        'name': name,
         'code': code
-
     }
+activities_cool
 
 pass
 
-"""
 
-# collect processor, carrier and CODE
-processors_data = []
-
-
-for row in processors.iter_rows(min_row=2):
-    if row[1].value:
-        processors_data.append((row[1].value, row[2].value, row[20].value))
-# JUST TAKE THE CODES
-codes = [x[2] for x in processors_data]
-# COPY, IN ORDER TO CHECK WHICH ARE MISSING
-pass
-
-
-pass
-# read all values in column I
-
-activities = []
-
-for pd in processors_data:
-    try:
-        activity = database.get_node(pd[2])
-        activities.append((activity, *pd))
-    except UnknownObject:
-        print(pd, "not found")
-activities
-pass
-
-
-#redo the alias
-
-potential_aliases = [act[1] for act in activities]
-
-counts=Counter(potential_aliases)
-print("All unique", len(potential_aliases) == len(set(potential_aliases)))
-
-activities_ = []
-for act in activities:
-    full_alias = f"{act[1]}_{act[2]}"
-    activities_.append((full_alias, *act[1:]))
-
-
-
-
-
-activities_bw: dict[str, Activity] = {}
-for activity in activities:
-    #activities_bw[activity[0]] = database.get_node(activity[3])
-    activities_bw[activity[1]] = database.get_node(activity[3])
-    #alias=activities_bw[activity[1]]
-
-
-activities_bw
-pass
-"""
 
 
 
@@ -145,26 +98,34 @@ def full_duplicate(activity: Activity, code=None, **kwargs) -> Activity:
 
 
 for key,item in tqdm(activities_cool.items()):
-    print(key)
-    act=database.get(item['code'])
-    alias=item['alias']
-    #check if the activity is in the db:
-    clone1 = full_duplicate(act)
-    if clone1 in seeds_db:
-        print('hey, I here',clone1['name'])
-
-
+    print(f'key is {key}')
+    try:
+        act=database.get(item['code'])
+    except bd.errors.UnknownObject:
+        continue
+    alias=key
+    if key=='el_import_electricity__PRT_ESP-sink':
+        imports=full_duplicate(act)
+        imports['name']=imports['name']
+        imports['database']=SEEDS_DB_NAME
+        imports['alias']=alias
+        imports.save()
     else:
+
+
+
+
+        #check if the activity is in the db:
+        clone1 = full_duplicate(act)
+
         clone1["name"] = clone1['name'] + "__PRT_1"
         clone1["database"] = SEEDS_DB_NAME
         clone1["alias"] = alias + "__PRT_1"
         clone1.save()
 
 
-    clone2 = full_duplicate(act)
-    if clone2 in seeds_db:
-        pass
-    else:
+        clone2 = full_duplicate(act)
+
         clone2["name"] = clone2["name"] + "__PRT_2"
         clone2["database"] = SEEDS_DB_NAME
         clone2["alias"] = alias + "__PRT_2"
@@ -183,6 +144,7 @@ enbios2_activities = {
     }
     for activity in list(seeds_db)
 }
+enbios2_activities
 pass
 
 from csv import DictReader
@@ -238,25 +200,6 @@ def generate_scenarios(calliope_data,smaller_vers=False):
 
 
 enbios2scenarios=generate_scenarios(calliope,smaller_vers=True)
-
-""""
-
-current_scenario_index = 0
-current_scenario = {}
-for row in raw_scenario_data:
-    scen=str(row['scenarios']).split('_')[-1]
-    scenario_index = int(scen)
-    assert current_scenario_index <= scenario_index <= current_scenario_index + 1
-    if scenario_index == current_scenario_index + 1:
-        current_scenario_index = scenario_index
-        enbios2scenarios.append({"activities": current_scenario.copy()})
-        current_scenario = {}
-    alias = f'{row["techs"]}_{row["carriers"]}__{row["locs"]}'
-    current_scenario[alias] = [row["units"], row["flow_out_sum"]]
-
-enbios2scenarios[0]
-"""
-
 
 
 
