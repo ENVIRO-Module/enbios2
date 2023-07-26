@@ -6,7 +6,6 @@ import pandas as pd
 from collections import Counter
 from enbios2.base.experiment import Experiment
 import bw2data as bd
-import bw2io
 from projects.seed.Data.const import data_path
 import openpyxl
 import json
@@ -39,24 +38,23 @@ activities_cool={}
 for index,row in processors.iterrows():
     code=str(row['BW_DB_FILENAME'])
 
-    print('im parsing', str(row['Processor']))
+    print('im parsing', str(row['Processor']), code)
     try:
-        act=database.get(code)
+        act=database.get_node(code)
 
     except UnknownObject:
         print(row['Processor'],'has an unknown object')
         pass
 
     name=act['name']
-
+    unit=act['unit']
     alias=str(row['Processor'])+'_'+str(row['@SimulationCarrier'])
     print(alias)
 
 
-
     activities_cool[alias]={
         'name': name,
-        'code': code
+        'code': code,
     }
 activities_cool
 
@@ -74,7 +72,7 @@ print(list(bd.databases))
 SEEDS_DB_NAME = "seeds"
 
 seeds_db = bd.Database(SEEDS_DB_NAME)
-seeds_db.register()
+#seeds_db.register()
 
 
 
@@ -112,15 +110,13 @@ for key,item in tqdm(activities_cool.items()):
         imports.save()
     else:
 
-
-
-
         #check if the activity is in the db:
         clone1 = full_duplicate(act)
 
         clone1["name"] = clone1['name'] + "__PRT_1"
         clone1["database"] = SEEDS_DB_NAME
         clone1["alias"] = alias + "__PRT_1"
+        clone1['unit']=act['unit']
         clone1.save()
 
 
@@ -129,8 +125,12 @@ for key,item in tqdm(activities_cool.items()):
         clone2["name"] = clone2["name"] + "__PRT_2"
         clone2["database"] = SEEDS_DB_NAME
         clone2["alias"] = alias + "__PRT_2"
+        clone2['unit'] = act['unit']
         clone2.save()
-print(list(seeds_db))
+
+        assert act['unit']==clone1['unit'], "HEYYYYYYY"
+        print(act['unit'], clone1['unit'])
+
 
 
 
@@ -141,10 +141,13 @@ pass
 enbios2_activities = {
     activity["alias"]: {
         "id": {"code": activity["code"]}
+
     }
     for activity in list(seeds_db)
 }
 enbios2_activities
+
+
 pass
 
 from csv import DictReader
@@ -180,7 +183,7 @@ def get_stuff(df):
 def generate_scenarios(calliope_data,smaller_vers=False):
 
 
-    cal_dat=pd.read_csv(calliope,delimiter=',')
+    cal_dat=pd.read_csv(calliope_data,delimiter=',')
     cal_dat['aliases']=cal_dat['techs'] + '_' + cal_dat['carriers'] + '__' + cal_dat['locs']
     scenarios=cal_dat['scenarios'].unique().tolist()
     if smaller_vers: # get a small version of the data
