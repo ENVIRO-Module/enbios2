@@ -301,7 +301,7 @@ class BasicTreeNode(Generic[T]):
             self.add_child(child)
         return self
 
-    def find_child_by_name(self, name: str, recursive: bool = True) -> Optional["BasicTreeNode"]:
+    def find_child_by_name(self, name: str, recursive: bool = True) -> Optional["BasicTreeNode[T]"]:
         """
         Find a child node by its name.
 

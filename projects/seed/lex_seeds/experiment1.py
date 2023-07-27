@@ -1,83 +1,69 @@
 """
 first experiment
 """
-from logging import getLogger
-import pandas as pd
-from collections import Counter
-from enbios2.base.experiment import Experiment
-import bw2data as bd
-from projects.seed.Data.const import data_path
-import openpyxl
 import json
-from bw2data.errors import UnknownObject
+from logging import getLogger
+
+import bw2data
+import bw2data as bd
+import openpyxl
+import pandas as pd
 from bw2data.backends import Activity
+from bw2data.errors import UnknownObject
 
-
+from enbios2.generic.files import DataPath
 
 getLogger("peewee").setLevel("ERROR")
 
-pass
+data_path = DataPath("temp/seeds")
+processors_path = data_path / 'base_file_simplified.xlsx'
+calliope = data_path / 'flow_out_sum_modified.csv'
+dict_path = data_path / 'dict.json'
 
-processors_path=data_path / 'base_file_simplified.xlsx'
-calliope=data_path / 'flow_out_sum_modified.csv'
-dict_path=data_path /'dict.json'
-
-
-
-data=openpyxl.load_workbook(processors_path)
-processors=data.active
-bd.projects.set_current('Hydrogen_SEEDS_3')
-database=bd.Database('CUTOFF_391')
+data = openpyxl.load_workbook(processors_path)
+processors = data.active
+bd.projects.set_current('ecoinvent')
+database = bd.Database('cutoff_3.9.1_default')
 
 print(bd.projects.dir)
-pass
 
-processors=pd.read_excel(processors_path, sheet_name='BareProcessors simulation')
+processors = pd.read_excel(processors_path, sheet_name='BareProcessors simulation')
 
-activities_cool={}
-for index,row in processors.iterrows():
-    code=str(row['BW_DB_FILENAME'])
+activities_cool = {}
+for index, row in processors.iterrows():
+    code = str(row['BW_DB_FILENAME'])
 
     print('im parsing', str(row['Processor']), code)
     try:
-        act=database.get_node(code)
+        act = database.get_node(code)
 
     except UnknownObject:
-        print(row['Processor'],'has an unknown object')
+        print(row['Processor'], 'has an unknown object')
         pass
 
-    name=act['name']
-    unit=act['unit']
-    alias=str(row['Processor'])+'_'+str(row['@SimulationCarrier'])
+    name = act['name']
+    unit = act['unit']
+    alias = str(row['Processor']) + '_' + str(row['@SimulationCarrier'])
     print(alias)
 
-
-    activities_cool[alias]={
+    activities_cool[alias] = {
         'name': name,
         'code': code,
     }
 activities_cool
 
-pass
-
-
-
-
-
 SEEDS_DB_NAME = "seeds"
-seeds_db = bd.Database(SEEDS_DB_NAME)
 
 print(list(bd.databases))
 
-SEEDS_DB_NAME = "seeds"
-
 seeds_db = bd.Database(SEEDS_DB_NAME)
-#seeds_db.register()
-
-
+if not seeds_db.exists(SEEDS_DB_NAME):
+    seeds_db.save()
+# seeds_db.register()
 
 
 from tqdm import tqdm
+
 
 def full_duplicate(activity: Activity, code=None, **kwargs) -> Activity:
     """
@@ -95,30 +81,30 @@ def full_duplicate(activity: Activity, code=None, **kwargs) -> Activity:
     return activity_copy
 
 
-for key,item in tqdm(activities_cool.items()):
+for key, item in tqdm(activities_cool.items()):
     print(f'key is {key}')
     try:
-        act=database.get(item['code'])
+        act = database.get_node(item['code'])
     except bd.errors.UnknownObject:
         continue
-    alias=key
-    if key=='el_import_electricity__PRT_ESP-sink':
-        imports=full_duplicate(act)
-        imports['name']=imports['name']
-        imports['database']=SEEDS_DB_NAME
-        imports['alias']=alias
+    alias = key
+    if key == 'el_import_electricity':
+        alias = 'el_import_electricity__PRT_ESP-sink'
+        imports = full_duplicate(act)
+        imports['name'] = imports['name']
+        imports['database'] = SEEDS_DB_NAME
+        imports['alias'] = alias
         imports.save()
     else:
 
-        #check if the activity is in the db:
+        # check if the activity is in the db:
         clone1 = full_duplicate(act)
 
         clone1["name"] = clone1['name'] + "__PRT_1"
         clone1["database"] = SEEDS_DB_NAME
         clone1["alias"] = alias + "__PRT_1"
-        clone1['unit']=act['unit']
+        clone1['unit'] = act['unit']
         clone1.save()
-
 
         clone2 = full_duplicate(act)
 
@@ -128,15 +114,8 @@ for key,item in tqdm(activities_cool.items()):
         clone2['unit'] = act['unit']
         clone2.save()
 
-        assert act['unit']==clone1['unit'], "HEYYYYYYY"
+        assert act['unit'] == clone1['unit'], "HEYYYYYYY"
         print(act['unit'], clone1['unit'])
-
-
-
-
-pass
-
-
 
 enbios2_activities = {
     activity["alias"]: {
@@ -146,18 +125,17 @@ enbios2_activities = {
     for activity in list(seeds_db)
 }
 enbios2_activities
-
-
 pass
 
 from csv import DictReader
-from enbios2.generic.files import ReadDataPath
+from enbios2.generic.files import ReadDataPath, DataPath
 
 enbios2scenarios = []
-raw_scenarios = ReadDataPath(calliope) # .read_data()
+raw_scenarios = ReadDataPath(calliope)  # .read_data()
 raw_scenario_data = list(DictReader(raw_scenarios.open(encoding="utf-8"), delimiter=","))
 pass
 print(raw_scenario_data[:5])
+
 
 # Scenarios_cool
 
@@ -167,48 +145,43 @@ def get_stuff(df):
     :param df:
     :return:
     """
-    stuff={}
+    stuff = {}
 
-    for index,row in df.iterrows():
-        other_stuff=[]
-        alias=row['aliases']
-        flow_out_sum=(row['flow_out_sum'])
-        unit=row['units']
+    for index, row in df.iterrows():
+        other_stuff = []
+        alias = row['aliases']
+        flow_out_sum = (row['flow_out_sum'])
+        unit = row['units']
         other_stuff.append(unit)
         other_stuff.append(flow_out_sum)
 
-        stuff[alias]=other_stuff
+        stuff[alias] = other_stuff
     return stuff
 
-def generate_scenarios(calliope_data,smaller_vers=False):
 
+def generate_scenarios(calliope_data, smaller_vers=False):
+    cal_dat = pd.read_csv(calliope_data, delimiter=',')
+    cal_dat['aliases'] = cal_dat['techs'] + '_' + cal_dat['carriers'] + '__' + cal_dat['locs']
+    scenarios = cal_dat['scenarios'].unique().tolist()
+    if smaller_vers:  # get a small version of the data
+        scenarios = scenarios[:3]
 
-    cal_dat=pd.read_csv(calliope_data,delimiter=',')
-    cal_dat['aliases']=cal_dat['techs'] + '_' + cal_dat['carriers'] + '__' + cal_dat['locs']
-    scenarios=cal_dat['scenarios'].unique().tolist()
-    if smaller_vers: # get a small version of the data
-        scenarios=scenarios[:3]
-
-    cooler_dooper={}
+    cooler_dooper = {}
 
     for scenario in scenarios:
-        df=cal_dat[cal_dat['scenarios']==scenario]
-        stuff=get_stuff(df)
-        cooler_dooper[scenario]={}
-        cooler_dooper[scenario]['activities']=stuff
-
+        df = cal_dat[cal_dat['scenarios'] == scenario]
+        stuff = get_stuff(df)
+        cooler_dooper[scenario] = {}
+        cooler_dooper[scenario]['activities'] = stuff
 
     return cooler_dooper
 
 
-
-enbios2scenarios=generate_scenarios(calliope,smaller_vers=True)
-
-
+enbios2scenarios = generate_scenarios(calliope, smaller_vers=True)
 
 from ast import literal_eval
 
-#2=openpyxl.load_workbook(processors_path)
+# 2=openpyxl.load_workbook(processors_path)
 
 methods = data["ScalarIndicators"]
 
@@ -223,36 +196,31 @@ for row in methods.iter_rows(min_row=2):
             "id": method_tuple
         }
 
-enbios2_methods={
-'ozone depletion potential (ODPinfinite)': ('ReCiPe 2016 v1.03, midpoint (H)',
-  'ozone depletion',
-  'ozone depletion potential (ODPinfinite)'),
- 'agricultural land occupation (LOP)': ('ReCiPe 2016 v1.03, midpoint (H)',
-  'land use',
-  'agricultural land occupation (LOP)'),
- 'surplus ore potential (SOP)': ('ReCiPe 2016 v1.03, midpoint (H)',
-  'material resources: metals/minerals',
-  'surplus ore potential (SOP)'),
- 'global warming potential (GWP1000)': ('ReCiPe 2016 v1.03, midpoint (H)',
-  'climate change',
-  'global warming potential (GWP1000)')
+enbios2_methods = {
+    'ozone depletion potential (ODPinfinite)': ('ReCiPe 2016 v1.03, midpoint (H)',
+                                                'ozone depletion',
+                                                'ozone depletion potential (ODPinfinite)'),
+    'agricultural land occupation (LOP)': ('ReCiPe 2016 v1.03, midpoint (H)',
+                                           'land use',
+                                           'agricultural land occupation (LOP)'),
+    'surplus ore potential (SOP)': ('ReCiPe 2016 v1.03, midpoint (H)',
+                                    'material resources: metals/minerals',
+                                    'surplus ore potential (SOP)'),
+    'global warming potential (GWP1000)': ('ReCiPe 2016 v1.03, midpoint (H)',
+                                           'climate change',
+                                           'global warming potential (GWP1000)')
 }
 pass
 
-
 enbios2_data = {
-    "bw_project":'Hydrogen_SEEDS_3',
+    "bw_project": 'ecoinvent',
     "activities": enbios2_activities,
     "methods": enbios2_methods,
     "scenarios": enbios2scenarios
 }
 
 with open(dict_path, 'w') as gen_dict:
-    json.dump(enbios2_data,gen_dict, indent=4)
-
-
-
-
+    json.dump(enbios2_data, gen_dict, indent=4)
 
 from enbios2.base.experiment import Experiment
 from enbios2.models.experiment_models import ExperimentData
@@ -269,9 +237,4 @@ for scenario in exp.scenarios:
     result_tree = scenario.run()
     scenario.results_to_csv(Path(f"results/{scenario.alias}.csv"), True)
 
-
-
-
 pass
-
-

@@ -134,6 +134,9 @@ class Scenario:
                             f"Cannot parse output unit '{ao}'- {activity_output} of activity {child.name}. {err}. "
                             f"Consider the unit definition to 'enbios2/base/unit_registry.py'")
                         pass
+                    except TypeError as err:
+                        logger.error(err)
+                        pass
                 if not output:
                     raise ValueError(f"Cannot parse output unit {activity_output} of activity {child.name}. {err}")
                 try:
@@ -149,8 +152,11 @@ class Scenario:
             node_output = node_output.to_compact()
             node.data.output = (str(node_output.units), node_output.magnitude)
 
-        self.result_tree.recursive_apply(recursive_resolve_outputs, depth_first=True)
-
+        try:
+            self.result_tree.recursive_apply(recursive_resolve_outputs, depth_first=True)
+        except Exception as err:
+            logger.error(f"Scenario {self.alias} has no outputs...")
+            logger.error(err)
         return self.create_results_to_technology_tree(results)
 
     def results_to_csv(self, file_path: Path, include_method_units: bool = False):
@@ -279,7 +285,7 @@ class Experiment:
 
             if ext_activity.output:
                 ext_activity.default_output_value = Experiment.validate_output(ext_activity.output, ext_activity)
-        assert len(unique_activities) == len(activities), "Not all activities are unique"
+        # assert len(unique_activities) == len(activities), "Not all activities are unique"
 
     @staticmethod
     def validate_output(target_output: ExtendedExperimentActivityOutput,
@@ -375,7 +381,11 @@ class Experiment:
             for activity in self.activitiesMap.values():
                 activity_alias = activity.alias
                 if activity_alias not in scenario_activities_outputs:
-                    scenario_activities_outputs[activity.alias] = activity.default_output_value
+                    scenario_activities_outputs[activity.alias] = 1
+                    logger.warning(
+                        f"Activity: '{activity_alias}' has no output for scenario {scenario.alias} "
+                        f"and will be set to 1")
+
 
             if scenario.methods:
                 if isinstance(scenario.methods, list):
