@@ -73,15 +73,12 @@ class Scenario:
                         node.data.results[key] = 0
                     node.data.results[key] += value
 
-        activity_nodes = list(self.result_tree.get_leaves())
-        # todo should be the same set of activities
         activities_aliases = list(self.activities_outputs.keys())
 
         methods_aliases: list[str] = list(self.get_methods().keys())
         for result_index, alias in enumerate(activities_aliases):
-            bw_activity = self.experiment.get_activity(alias).bw_activity
             try:
-                activity_node = next(filter(lambda node: node.temp_data().bw_activity == bw_activity, activity_nodes))
+                activity_node = self.result_tree.find_child_by_name(alias)
             except StopIteration:
                 raise ValueError(f"Activity {alias} not found in the technology tree [TODO: this should not happen]")
 
@@ -109,7 +106,8 @@ class Scenario:
         for result_index, alias in enumerate(activities_aliases):
             bw_activity = self.experiment.get_activity(alias).bw_activity
             try:
-                activity_node = next(filter(lambda node: node.temp_data().bw_activity == bw_activity, activity_nodes))
+                activity_node = self.result_tree.find_child_by_name(alias)
+                # activity_node = next(filter(lambda node: node.temp_data().bw_activity == bw_activity, activity_nodes))
             except StopIteration:
                 raise ValueError(f"Activity {alias} not found in the technology tree [TODO: this should not happen]")
 
@@ -124,7 +122,8 @@ class Scenario:
             node_output = None
             for child in node.children:
                 activity_output = child.data.output[0]
-                units = set([activity_output, activity_output.replace("_", " ")])
+                units = {activity_output, activity_output.replace("_", " ")}
+                output = None
                 for ao in units:
                     try:
                         output = ureg.parse_expression(ao) * child.data.output[1]
@@ -138,7 +137,7 @@ class Scenario:
                         logger.error(err)
                         pass
                 if not output:
-                    raise ValueError(f"Cannot parse output unit {activity_output} of activity {child.name}. {err}")
+                    raise ValueError(f"Cannot parse output unit {activity_output} of activity {child.name}.")
                 try:
                     if not node_output:
                         node_output = output
@@ -149,8 +148,11 @@ class Scenario:
                                    f"From earlier children the base unit is {node_output.to_base_units()} "
                                    f"and from {child.name} it is {output.units}."
                                    f" {err}")
-            node_output = node_output.to_compact()
-            node.data.output = (str(node_output.units), node_output.magnitude)
+                    node_output = None
+                    break
+            if node_output:
+                node_output = node_output.to_compact()
+                node.data.output = (str(node_output.units), node_output.magnitude)
 
         try:
             self.result_tree.recursive_apply(recursive_resolve_outputs, depth_first=True)
