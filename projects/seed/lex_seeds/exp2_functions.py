@@ -231,11 +231,12 @@ def hierarchy(data):
             list_total.append(list_2)
 
     dict_tree=list_total[-1]
+    a=dict_tree[-1]
     with open(tree_path,'w') as file:
-        json.dump(dict_tree,file, indent=4)
+        json.dump(a,file, indent=4)
 
 
-    return list_total[-1]
+    return dict_tree[-1]
 
 
 
