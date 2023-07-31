@@ -64,8 +64,6 @@ def get_scenario(df):
 
 
 
-
-
 def generate_scenarios(calliope_data, smaller_vers=False):
     """
     #Iterate through all the data from calliope (data.csv, output results...)
