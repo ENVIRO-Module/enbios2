@@ -153,9 +153,7 @@ def generate_activities(*args) ->dict:
     pprint.pprint(activities_cool)
     # CALL THE FUNCTION HERE
     activities={}
-    pass
     for element  in args:
-        print('ELEMTNT IS ',element)
         new_element=element.split('___')[0] #This should match the name
         for key in activities_cool.keys():
             if new_element==key:
@@ -168,7 +166,7 @@ def generate_activities(*args) ->dict:
 
                 }
 
-    print('#THE DICTIONARY IS')
+
     pprint.pprint(activities)
     return activities
 
@@ -181,7 +179,7 @@ def tree_last_level(df,*args):
     """
 
 
-    # TODO: modify here to adapt the alias
+
     new_rows=[]
 
     for index,row in df.iterrows():

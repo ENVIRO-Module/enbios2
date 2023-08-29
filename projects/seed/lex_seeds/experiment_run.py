@@ -19,9 +19,6 @@ getLogger("peewee").setLevel("ERROR")
 
 dict_path = data_path / 'enbios_input_3.json'
 
-
-
-
 exp_file=ReadPath(dict_path)
 exp_data= ExperimentData(**exp_file.read_data())
 exp = Experiment(exp_data)
