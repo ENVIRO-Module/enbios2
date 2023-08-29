@@ -339,6 +339,7 @@ class Experiment:
             activity = self.activitiesMap.get(alias_or_id, None)
             if not activity and raise_error_if_missing:
                 raise ValueError(f"Activity with alias {alias_or_id} not found")
+
             return activity
         elif isinstance(alias_or_id, ExperimentActivityId):
             for activity in self.activitiesMap.values():

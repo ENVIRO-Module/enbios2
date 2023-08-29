@@ -6,13 +6,17 @@ from enbios2.models.experiment_models import ExperimentData
 bw2data.projects.set_current('ecoinvent')
 main_db = bw2data.Database('cutoff_3.9.1_default')
 
-act = main_db.get_node("aa169d28adeec792ac2f0f3aac450b75")
+act = main_db.get_node("81174ec2c20931c1a36f65c654bbd11e")
 print(act["name"])
+
+
+"""
+
 lca_res = act.lca(method=("ReCiPe 2016 v1.03, midpoint (H)",
                           "ozone depletion",
                           "ozone depletion potential (ODPinfinite)"))
 print(lca_res.score)
-
+"""
 # enbios2_data = {
 #     "bw_project": "ecoinvent",
 #     "activities": {

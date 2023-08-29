@@ -1,7 +1,7 @@
 """
 Alternative if no need to copy activities in a new DB
 """
-
+import pprint
 import json
 import random
 from logging import getLogger
@@ -22,7 +22,7 @@ getLogger("peewee").setLevel("ERROR")
 processors_path = data_path / 'base_file_simplified.xlsx'
 
 calliope = data_path / 'flow_out_sum_modified.csv'
-dict_path = data_path / 'enbios_input_2.json'
+dict_path = data_path / 'enbios_input_3.json'
 tree_path=data_path / 'tree_mod.json'
 tree_path_2=data_path / 'tree_mod2.json'
 dict_gen=data_path/'dict_names.json'
@@ -126,7 +126,7 @@ def generate_scenarios(calliope_data, smaller_vers=False):
     return cooler_dooper,acts
 
 
-def generate_activities(*args):
+def generate_activities(*args) ->dict:
     processors = pd.read_excel(processors_path, sheet_name='BareProcessors simulation')
 
     activities_cool = {}
@@ -143,17 +143,19 @@ def generate_activities(*args):
 
         name = act['name']
         unit = act['unit']
-        alias = str(row['Processor']) + '_' + str(row['@SimulationCarrier'])
+        alias = str(row['Processor']) + '__' + str(row['@SimulationCarrier'])
         print(alias)
 
         activities_cool[alias] = {
             'name': name,
             'code': code,
         }
-
+    pprint.pprint(activities_cool)
     # CALL THE FUNCTION HERE
     activities={}
+    pass
     for element  in args:
+        print('ELEMTNT IS ',element)
         new_element=element.split('___')[0] #This should match the name
         for key in activities_cool.keys():
             if new_element==key:
@@ -165,6 +167,9 @@ def generate_activities(*args):
                     }
 
                 }
+
+    print('#THE DICTIONARY IS')
+    pprint.pprint(activities)
     return activities
 
 def tree_last_level(df,*args):
@@ -307,6 +312,7 @@ enbios2_methods = {
 
 
 enbios2scenarios,activ_names = generate_scenarios(calliope, smaller_vers=True)
+hope_final_acts=generate_activities(*activ_names)
 print(activ_names)
 
 
@@ -355,16 +361,6 @@ print_all_list_values(hierarchy)
 
 
 
-
-
-
-
-
-
-
-hope_final_acts=generate_activities(*activ_names)
-
-
 enbios2_data = {
     "bw_project": 'ecoinvent',
     "activities": hope_final_acts,
@@ -373,8 +369,8 @@ enbios2_data = {
     "scenarios": enbios2scenarios
 }
 
-with open(dict_path, 'w') as gen_dict:
-    json.dump(enbios2_data, gen_dict, indent=4)
+with open(dict_path, 'w') as gen_diction:
+    json.dump(enbios2_data, gen_diction, indent=4)
 pass
 
 print(activ_names)
