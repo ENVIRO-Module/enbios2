@@ -24,6 +24,8 @@ processors_path = data_path / 'base_file_simplified.xlsx'
 calliope = data_path / 'flow_out_sum_modified.csv'
 dict_path = data_path / 'enbios_input_2.json'
 tree_path=data_path / 'tree_mod.json'
+tree_path_2=data_path / 'tree_mod2.json'
+dict_gen=data_path/'dict_names.json'
 data = openpyxl.load_workbook(processors_path)
 processors = data.active
 bd.projects.set_current('ecoinvent')
@@ -70,9 +72,9 @@ def get_scenario(df):
 
 def generate_scenarios(calliope_data, smaller_vers=False):
     """
-    #Iterate through all the data from calliope (data.csv, output results...)
+    Iterate through the data from calliope (data.csv, output results...)
         -Create new columns, such as alias
-        -
+
     :param calliope_data:
     :param smaller_vers: BOOL, if true, a small version of the data for testing gets produced
     :return:
@@ -80,7 +82,7 @@ def generate_scenarios(calliope_data, smaller_vers=False):
 
 
     cal_dat = pd.read_csv(calliope_data, delimiter=',')
-    cal_dat['aliases'] = cal_dat['techs'] + '_' + cal_dat['carriers'] + '___' + cal_dat['locs'] # Use ___ to split the loc for the recognision of the activities
+    cal_dat['aliases'] = cal_dat['techs'] + '__' + cal_dat['carriers'] + '___' + cal_dat['locs'] # Use ___ to split the loc for the recognision of the activities
     scenarios = cal_dat['scenarios'].unique().tolist()
     if smaller_vers:  # get a small version of the data
         scenarios = scenarios[:3]
@@ -98,6 +100,28 @@ def generate_scenarios(calliope_data, smaller_vers=False):
     scens = random.choice(list(cooler_dooper.keys()))  # select a random scenario from the list
     print(f'techs from scenario {scens} chosen')
     acts=list(cooler_dooper[scens]['activities'].keys())
+
+
+    # Generate a code-region alias name dictionary to create the hierarchy
+
+    general={}
+    for act in set(acts):
+        act_key=act.split('___')[0]
+        if act_key not in general.keys():
+            elements_to_append=[]
+            for act2 in set(acts):
+                act_key2=act2.split('___')[0]
+                if act_key2 == act_key:
+                    elements_to_append.append(act2)
+            general[act_key]=elements_to_append
+
+
+    with open(dict_gen, 'w') as file:
+        json.dump(general, file, indent=4)
+
+
+
+
 
     return cooler_dooper,acts
 
@@ -143,7 +167,30 @@ def generate_activities(*args):
                 }
     return activities
 
-def tree_last_level(df):
+def tree_last_level(df,*args):
+    """
+
+    :param df:
+    :param names: comes from generate scenarios. List of unique aliases
+    :return:
+    """
+
+
+    # TODO: modify here to adapt the alias
+    new_rows=[]
+
+    for index,row in df.iterrows():
+        processor=row['Processor']
+
+        for element in args:
+            cop=element.split('___')[0]
+            if cop == processor:
+                new_row=row.copy()
+                new_row['Processor']=element
+
+                new_rows.append(new_row)
+
+    df = pd.concat([df] +new_rows, ignore_index=True)
 
 
     last_level_list=[]
@@ -191,14 +238,14 @@ def generate_dict(df,list_pre):
     return list_branches
 
 
-def hierarchy(data):
+def hierarchy(data,*args):
     df=pd.read_excel(data, sheet_name='parents')
     df2=pd.read_excel(data,sheet_name='BareProcessors simulation')
 
 
     # Do some changes to match the regions and aliases
 
-    df2['Processor']=df2['Processor']+'_'+df2['@SimulationCarrier']
+    df2['Processor']=df2['Processor']+'__'+df2['@SimulationCarrier']  # Mark, '__' for carrier split
 
     #start by the last level of parents
     levels=df['Level'].unique().tolist()
@@ -206,8 +253,7 @@ def hierarchy(data):
     last_level_processors='n-' + str(last_level_parent+1)
     df2['Level']=last_level_processors
     df=pd.concat([df,df2[['Processor','ParentProcessor','Level']]],ignore_index=True,axis=0)
-    print(df)
-    print(last_level_parent)
+
     levels = df['Level'].unique().tolist()
 
     list_total=[]
@@ -219,7 +265,7 @@ def hierarchy(data):
             break
         elif level==levels[-1]:
 
-            last=tree_last_level(df_level)
+            last=tree_last_level(df_level,*args)
             global last_list
             last_list=last
 
@@ -236,16 +282,11 @@ def hierarchy(data):
         json.dump(a,file, indent=4)
 
 
+
     return dict_tree[-1]
 
 
 
-hierarchy=hierarchy(processors_path)
-
-
-
-
-"""
 
 
 enbios2_methods = {
@@ -262,10 +303,64 @@ enbios2_methods = {
                                            'climate change',
                                            'global warming potential (GWP1000)')
 }
-pass
+
 
 
 enbios2scenarios,activ_names = generate_scenarios(calliope, smaller_vers=True)
+print(activ_names)
+
+
+hierarchy=hierarchy(processors_path,*activ_names)
+
+
+with open(dict_gen, 'r') as second_file:
+    second_dict = json.load(second_file)
+
+def print_all_list_values(hierarchy_dict):
+    # 1 look for the list
+
+    for value in hierarchy_dict.values():
+
+        if isinstance(value, list):
+            print("Lista encontrada:", value)
+
+            values_copy = value[:]
+            value.clear()
+
+            print(values_copy)
+            for element in values_copy:
+
+                for key,val in second_dict.items():
+                    if element==key:
+                        print(element, 'is equal to', key)
+                        list_names=second_dict[key]
+
+                        # 3. Include the new names
+                        for name in list_names:
+                            print(name)
+                            value.append(name)
+
+
+
+        elif isinstance(value, dict):
+            print_all_list_values(value)
+
+    with open(tree_path_2, 'w') as file:
+            json.dump(hierarchy_dict, file, indent=4)
+
+print_all_list_values(hierarchy)
+
+
+
+
+
+
+
+
+
+
+
+
 
 hope_final_acts=generate_activities(*activ_names)
 
@@ -273,16 +368,18 @@ hope_final_acts=generate_activities(*activ_names)
 enbios2_data = {
     "bw_project": 'ecoinvent',
     "activities": hope_final_acts,
+    "hierarchy" : hierarchy,
     "methods": enbios2_methods,
     "scenarios": enbios2scenarios
 }
 
 with open(dict_path, 'w') as gen_dict:
     json.dump(enbios2_data, gen_dict, indent=4)
+pass
 
-
+print(activ_names)
 # We're assuming that one scenario includes all the possible technologies
 
 
-"""
+
 
