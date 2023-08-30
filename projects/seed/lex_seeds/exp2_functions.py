@@ -1,58 +1,48 @@
 """
+Created on 30 09:21:31 2023
+@author: LexPascal
 Alternative if no need to copy activities in a new DB
 """
 import pprint
 import json
 import random
 from logging import getLogger
-from pathlib import Path
-import typing
-import bw2data
 import bw2data as bd
 import openpyxl
 import pandas as pd
-from bw2data.backends import Activity
 from bw2data.errors import UnknownObject
-from ast import literal_eval
-from enbios2.generic.files import DataPath
 from projects.seed.Data.const import data_path
+
 getLogger("peewee").setLevel("ERROR")
 
 #data_path = DataPath("temp/seeds")
 processors_path = data_path / 'base_file_simplified.xlsx'
 
-calliope = data_path / 'flow_out_sum_modified.csv'
-dict_path = data_path / 'enbios_input_3.json'
-tree_path=data_path / 'tree_mod.json'
-tree_path_2=data_path / 'tree_mod2.json'
-dict_gen=data_path/'dict_names.json'
+calliope = data_path / 'flow_out_sum_modified.csv'  # Calliope results
+dict_path = data_path / 'enbios_input_3.json'       # Dictionary
+tree_path=data_path / 'tree_mod.json'               # Intermediate file
+tree_path_2=data_path / 'tree_mod2.json'            # Check
+dict_gen=data_path/'dict_names.json'                # Intermediate file alias -- regions
 data = openpyxl.load_workbook(processors_path)
 processors = data.active
 bd.projects.set_current('ecoinvent')
 database = bd.Database('cutoff_3.9.1_default')
 
-print(bd.projects.dir)
-
-
-
-
-# Scenarios_cool
-
-def get_scenario(df):
+def get_scenario(df) -> dict:
     """
     Iters through 1 scenario of the data.csv (scenarios data), storing basic data in a dictionary
-    Gets like
+    Get {
     activities : {
         alias : [
         unit,
         amount]
+    }
     }
 
     :param df:
     :return:
     """
     scenario = {}
-
 
     for index, row in df.iterrows():
         other_stuff = []
@@ -74,34 +64,36 @@ def generate_scenarios(calliope_data, smaller_vers=False):
     """
     Iterate through the data from calliope (data.csv, output results...)
         -Create new columns, such as alias
-
+    The function includes an intermediate step to create the hierarchy
     :param calliope_data:
     :param smaller_vers: BOOL, if true, a small version of the data for testing gets produced
-    :return:
+    :return:scen_dict, acts
+            *scen dict --> dictionary of the different scenarios
+            *acts --> list including all the unique activities
     """
 
 
     cal_dat = pd.read_csv(calliope_data, delimiter=',')
     cal_dat['aliases'] = cal_dat['techs'] + '__' + cal_dat['carriers'] + '___' + cal_dat['locs'] # Use ___ to split the loc for the recognision of the activities
     scenarios = cal_dat['scenarios'].unique().tolist()
-    if smaller_vers:  # get a small version of the data
+    if smaller_vers:  # get a small version of the data ( only 3 scenarios )
         scenarios = scenarios[:3]
 
-    cooler_dooper = {}
+    scen_dict = {}
 
     for scenario in scenarios:
         df = cal_dat[cal_dat['scenarios'] == scenario]
         stuff = get_scenario(df)
-        cooler_dooper[scenario] = {}
-        cooler_dooper[scenario]['activities'] = stuff
+        scen_dict[scenario] = {}
+        scen_dict[scenario]['activities'] = stuff
 
     # GENERATE KEYS FOR THE SCENARIOS
 
-    scens = random.choice(list(cooler_dooper.keys()))  # select a random scenario from the list
+    scens = random.choice(list(scen_dict.keys()))  # select a random scenario from the list
     print(f'techs from scenario {scens} chosen')
-    acts=list(cooler_dooper[scens]['activities'].keys())
+    acts=list(scen_dict[scens]['activities'].keys())
 
-
+    # Intermediate step
     # Generate a code-region alias name dictionary to create the hierarchy
 
     general={}
@@ -115,18 +107,25 @@ def generate_scenarios(calliope_data, smaller_vers=False):
                     elements_to_append.append(act2)
             general[act_key]=elements_to_append
 
-
     with open(dict_gen, 'w') as file:
         json.dump(general, file, indent=4)
 
 
+    return scen_dict,acts
 
 
-
-    return cooler_dooper,acts
 
 
 def generate_activities(*args) ->dict:
+    """
+    This function reads the excel "mother file" and creates a dictionary.
+    It reads the BWs' codes and extracts information from each activity and stores them in a dictionary
+
+    :param args:
+    :return:
+    """
+
+
     processors = pd.read_excel(processors_path, sheet_name='BareProcessors simulation')
 
     activities_cool = {}
@@ -170,15 +169,17 @@ def generate_activities(*args) ->dict:
     pprint.pprint(activities)
     return activities
 
+
+# Hierarchy functions // (dendrogram)
+
 def tree_last_level(df,*args):
     """
+    This function creates the information required by hierarchy in the lowest level of the dendrogram
 
     :param df:
     :param names: comes from generate scenarios. List of unique aliases
     :return:
     """
-
-
 
     new_rows=[]
 
@@ -216,7 +217,6 @@ def generate_dict(df,list_pre):
     Pass a list of the lower level and the dataframe of the present
     Returns a list of the dictionary
 
-
     :param df:
     :param list:
     :return:
@@ -241,7 +241,16 @@ def generate_dict(df,list_pre):
     return list_branches
 
 
-def hierarchy(data,*args):
+def hierarchy(data,*args)->dict:
+    """
+    This function creates the hierarchy tree. It uses two complementary functions (generate_dict and tree_last_level).
+
+    It reads the information contained in the mother file starting by the bottom (n-lowest)
+    :param data:
+    :param args:
+    :return:
+    """
+
     df=pd.read_excel(data, sheet_name='parents')
     df2=pd.read_excel(data,sheet_name='BareProcessors simulation')
 
@@ -250,7 +259,7 @@ def hierarchy(data,*args):
 
     df2['Processor']=df2['Processor']+'__'+df2['@SimulationCarrier']  # Mark, '__' for carrier split
 
-    #start by the last level of parents
+    # start by the last level of parents
     levels=df['Level'].unique().tolist()
     last_level_parent=int(levels[-1].split('-')[-1])
     last_level_processors='n-' + str(last_level_parent+1)
@@ -284,13 +293,12 @@ def hierarchy(data,*args):
     with open(tree_path,'w') as file:
         json.dump(a,file, indent=4)
 
-
-
     return dict_tree[-1]
 
 
 
-
+# Methos (manually made)
+# TODO: create a function to build this information)
 
 enbios2_methods = {
     'ozone depletion potential (ODPinfinite)': ('ReCiPe 2016 v1.03, midpoint (H)',
@@ -307,57 +315,54 @@ enbios2_methods = {
                                            'global warming potential (GWP1000)')
 }
 
-
-
+# Run the functions
 enbios2scenarios,activ_names = generate_scenarios(calliope, smaller_vers=True)
 hope_final_acts=generate_activities(*activ_names)
 print(activ_names)
-
-
 hierarchy=hierarchy(processors_path,*activ_names)
 
+# Scince the activities of the dictionary do not match the different regions, we need to apply some modifications to the hierarchy tree
+# Load the intermediate file created in "generate_activities" matching the name of the activity with the different alias (regions)
 
 with open(dict_gen, 'r') as second_file:
-    second_dict = json.load(second_file)
+    map_names = json.load(second_file)
 
-def print_all_list_values(hierarchy_dict):
-    # 1 look for the list
+def hierarchy_refinement(hierarchy_dict):
+    """
+    Read the hierarchy dictionary and do some modifications:
+        * Replace the names of the activities by the ones defined in the mapping dictionary
+        Ex: hydro_run_of_river__electricity : [hydro_run_of_river__electricity___PRT_1, hydro_run_of_river__electricity___PRT_2]
 
+    :param hierarchy_dict:
+    :return: same dictionary modified
+    """
+    # 1 look for the lists. List contain the last levels of the dendrogram, where the names need to be modified
     for value in hierarchy_dict.values():
 
         if isinstance(value, list):
-            print("Lista encontrada:", value)
-
+            print("Lista found:", value)
+            # Copy the list
             values_copy = value[:]
             value.clear()
 
-            print(values_copy)
             for element in values_copy:
 
-                for key,val in second_dict.items():
+                for key,val in map_names.items():
                     if element==key:
-                        print(element, 'is equal to', key)
-                        list_names=second_dict[key]
-
+                        list_names=map_names[key]
                         # 3. Include the new names
                         for name in list_names:
                             print(name)
                             value.append(name)
-
-
-
         elif isinstance(value, dict):
-            print_all_list_values(value)
+            hierarchy_refinement(value)
 
     with open(tree_path_2, 'w') as file:
             json.dump(hierarchy_dict, file, indent=4)
 
-print_all_list_values(hierarchy)
+hierarchy_refinement(hierarchy)
 
-
-
-
-
+# Finally, create the global dictionary for enbios
 
 enbios2_data = {
     "bw_project": 'ecoinvent',
@@ -370,9 +375,6 @@ enbios2_data = {
 with open(dict_path, 'w') as gen_diction:
     json.dump(enbios2_data, gen_diction, indent=4)
 pass
-
-print(activ_names)
-# We're assuming that one scenario includes all the possible technologies
 
 
 
